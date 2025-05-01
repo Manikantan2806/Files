@@ -15,7 +15,7 @@ if f1 is not None:
     st.write(filename)
     df=pd.read_excel(filename,)
 else:
-    os.chdir(r"D:\Python_drive\Py files\ProjectM")
+    os.chdir(r"D:\\Python_drive\\Py files\\ProjectM")
     df=pd.read_excel("Salesallc.xlsx")
 
 col1, col2 =st.columns((2))
