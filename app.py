@@ -15,7 +15,7 @@ if f1 is not None:
     st.write(filename)
     df=pd.read_excel(filename,)
 else:
-    error
+    print("error")
 df["SALEDATE"] = pd.to_datetime(df["SALEDATE"])
 
 # Get min and max date from SALEDATE
