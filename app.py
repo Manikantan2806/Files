@@ -15,9 +15,7 @@ if f1 is not None:
     st.write(filename)
     df=pd.read_excel(filename,)
 else:
-    os.chdir(r"https://docs.google.com/spreadsheets/d/1sdESfx8Ouzgoa96PkSelguM6fpIA962P/edit?usp=sharing&ouid=116202969749852348106&rtpof=true&sd=true")
-    df=pd.read_excel("Salesallc.xlsx")
-
+    df=pd.read_excel("https://docs.google.com/spreadsheets/d/1sdESfx8Ouzgoa96PkSelguM6fpIA962P/edit?usp=drive_link&ouid=116202969749852348106&rtpof=true&sd=true")
 col1, col2 =st.columns((2))
 df["SALEDATE"] = pd.to_datetime(df["SALEDATE"])
 
