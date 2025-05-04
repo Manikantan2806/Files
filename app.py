@@ -10,17 +10,33 @@ st.set_page_config(page_title="T-base", page_icon=":bar_chart:", layout='wide')
 st.title(":bar_chart: T-base Dashboard")
 st.markdown("<style>div.block-container{padding-top: 2rem;}</style>", unsafe_allow_html=True)
 
-# Upload file
+# Read uploaded file
 f1 = st.file_uploader(":file_folder: Upload file", type=(["csv", "xlsx", "xls", "txt"]))
 
-# Load data
 if f1 is not None:
     filename = f1.name
     st.write("Loaded file:", filename)
+    
     if filename.endswith(".csv") or filename.endswith(".txt"):
         df = pd.read_csv(f1)
     else:
         df = pd.read_excel(f1)
+
+    # Clean column names
+    df.columns = df.columns.str.strip()
+
+    # Show columns for debugging
+    st.write("Columns found in file:", df.columns.tolist())
+
+    # Check for SALEDATE column
+    if "SALEDATE" not in df.columns:
+        st.error("❌ Column 'SALEDATE' not found in uploaded file. Please check your file headers.")
+        st.stop()
+
+    # Continue safely
+    df["SALEDATE"] = pd.to_datetime(df["SALEDATE"], errors='coerce')
+    df.dropna(subset=["SALEDATE"], inplace=True)
+
 else:
     # Fallback to public Google Sheet as CSV
     sheet_id = "YOUR_SHEET_ID_HERE"  # <-- Replace with your Google Sheet ID
