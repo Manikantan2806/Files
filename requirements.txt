@@ -2,5 +2,3 @@ plotly
 matplotlib
 streamlit
 pandas
-os
-warnings
