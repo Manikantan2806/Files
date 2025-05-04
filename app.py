@@ -15,7 +15,8 @@ if f1 is not None:
     st.write(filename)
     df=pd.read_excel(filename,)
 else:
-    print("error")
+    os.chdir(r"https://docs.google.com/spreadsheets/d/1sdESfx8Ouzgoa96PkSelguM6fpIA962P/edit?usp=drive_link&ouid=116202969749852348106&rtpof=true&sd=true")
+    df=ps.read_csv("Salesallc.xlsx")
 df["SALEDATE"] = pd.to_datetime(df["SALEDATE"])
 
 # Get min and max date from SALEDATE
