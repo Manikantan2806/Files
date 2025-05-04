@@ -6,169 +6,134 @@ import warnings
 warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="T-base", page_icon=":bar_chart:", layout='wide')
-
 st.title(":bar_chart: T-base Dashboard")
 st.markdown("<style>div.block-container{padding-top: 2rem;}</style>", unsafe_allow_html=True)
-f1=st.file_uploader(":file_folder: Upload file", type=(["csv", "xlsx", "xls","txt"]))
+
+f1 = st.file_uploader(":file_folder: Upload file", type=(["csv", "xlsx", "xls", "txt"]))
+
 if f1 is not None:
     filename = f1.name
     st.write("Loaded file:", filename)
-    
+
     if filename.endswith(".csv") or filename.endswith(".txt"):
         df = pd.read_csv(f1)
     else:
         df = pd.read_excel(f1)
 
-# Get min and max date from SALEDATE
-StartDate = df["SALEDATE"].min()
-EndDate = df["SALEDATE"].max()
+    # Clean column names
+    df.columns = df.columns.str.strip()
 
-with col1:
-    date1 = st.date_input("Start Date", StartDate)
+    # Check for SALEDATE
+    if "SALEDATE" not in df.columns:
+        st.error("❌ Column 'SALEDATE' not found in uploaded file. Please check your file headers.")
+        st.stop()
 
-with col2:
-    date2 = st.date_input("End Date", EndDate)
+    # Convert SALEDATE to datetime
+    df["SALEDATE"] = pd.to_datetime(df["SALEDATE"], errors='coerce')
+    df.dropna(subset=["SALEDATE"], inplace=True)
 
-# Filter data between the selected dates
-df = df[(df["SALEDATE"] >= pd.to_datetime(date1)) & (df["SALEDATE"] <= pd.to_datetime(date2))].copy()
+    # Sidebar filters layout
+    col1, col2 = st.columns(2)
 
-st.sidebar.header("Choose your filter")
+    StartDate = df["SALEDATE"].min()
+    EndDate = df["SALEDATE"].max()
 
-# channel filter 
-Channel=st.sidebar.multiselect("Pick your channel",df["Channel"].unique())
+    with col1:
+        date1 = st.date_input("Start Date", StartDate)
 
-if not Channel:
-    df2=df.copy()
-else:
-    df2=df[df["Channel"].isin(Channel)]
+    with col2:
+        date2 = st.date_input("End Date", EndDate)
 
-# BRAN_NAME filter
-BRAN_NAME=st.sidebar.multiselect("Pick your Store",df2["BRAN_NAME"].unique())
+    df = df[(df["SALEDATE"] >= pd.to_datetime(date1)) & (df["SALEDATE"] <= pd.to_datetime(date2))].copy()
 
-if not BRAN_NAME:
-    df3=df2.copy()
-else:
-    df3=df2[df2["BRAN_NAME"].isin(BRAN_NAME)]
+    st.sidebar.header("Choose your filter")
 
-# ITEM_DESC_SECONDARY filter(if not here in tute)
+    Channel = st.sidebar.multiselect("Pick your channel", df["Channel"].unique())
+    df2 = df[df["Channel"].isin(Channel)] if Channel else df.copy()
 
-ITEM_DESC_SECONDARY=st.sidebar.multiselect("Pick your Product",df3["ITEM_DESC_SECONDARY"].unique())
+    BRAN_NAME = st.sidebar.multiselect("Pick your Store", df2["BRAN_NAME"].unique())
+    df3 = df2[df2["BRAN_NAME"].isin(BRAN_NAME)] if BRAN_NAME else df2.copy()
 
-#if not ITEM_DESC_SECONDARY:
-#    df4=df3.copy()
-#else:
-#    df4=df3[df3["ITEM_DESC_SECONDARY"].isin(ITEM_DESC_SECONDARY)]
+    ITEM_DESC_SECONDARY = st.sidebar.multiselect("Pick your Product", df3["ITEM_DESC_SECONDARY"].unique())
 
-# filter the data base on channel Brand name and Item desc
+    # Final filtering
+    filtered_df = df3.copy()
+    if ITEM_DESC_SECONDARY:
+        filtered_df = filtered_df[filtered_df["ITEM_DESC_SECONDARY"].isin(ITEM_DESC_SECONDARY)]
 
-if not Channel and not BRAN_NAME and not ITEM_DESC_SECONDARY:
-    filtered_df=df
-elif not BRAN_NAME and not ITEM_DESC_SECONDARY:
-    filtered_df=df[df["Channel"].isin(Channel)]
-elif not Channel and not ITEM_DESC_SECONDARY:
-    filtered_df=df[df["BRAN_NAME"].isin(BRAN_NAME)]
-elif BRAN_NAME and ITEM_DESC_SECONDARY:
-    filtered_df=df3[df["BRAN_NAME"].isin(BRAN_NAME)]
-elif Channel and ITEM_DESC_SECONDARY:
-    filtered_df=df3[df["BRAN_NAME"].isin(Channel)]
-elif BRAN_NAME and Channel:
-    filtered_df=df3[df["Channel"].isin(Channel)]
-elif ITEM_DESC_SECONDARY:
-    filtered_df=df3[df["ITEM_DESC_SECONDARY"].isin(ITEM_DESC_SECONDARY)]
-else:
-    filtered_df=df3[df3["Channel"].isin(Channel) & df3["BRAN_NAME"].isin(BRAN_NAME) & df3['ITEM_DESC_SECONDARY']]
+    # Style-wise Sales Chart
+    style_df = filtered_df.groupby(by=["SHORT_DESC"], as_index=False)["Sales QTY"].sum()
 
-style_df = filtered_df.groupby(by = ["SHORT_DESC"], as_index = False)["Sales QTY"].sum()
+    with col1:
+        st.subheader("Stylewise sales")
+        fig = px.bar(style_df, x="SHORT_DESC", y="Sales QTY", text=style_df["Sales QTY"].apply(lambda x: f'{x:,.0f}'), template="seaborn")
+        st.plotly_chart(fig, use_container_width=True)
 
-with col1:
-    st.subheader("Stylwise sales")
-    fig=px.bar(style_df, x = "SHORT_DESC", y="Sales QTY", text= ['{:,.0f}'.format(x) for x in style_df["Sales QTY"]], template="seaborn")
-    st.plotly_chart(fig,use_container_width=True, height = 200)
+    with col2:
+        st.header("Channel wise sales")
+        fig = px.pie(filtered_df, values="Sales QTY", names="Channel", hole=0.5)
+        fig.update_traces(text=filtered_df["Channel"], textposition="outside")
+        st.plotly_chart(fig, use_container_width=True)
 
-with col2:
-    st.header("Channel wise sales")
-    fig= px.pie(filtered_df, values = "Sales QTY", names= "Channel", hole= 0.5)
-    fig.update_traces(text = filtered_df["Channel"], textposition = "outside")
-    st.plotly_chart(fig,use_container_width=True)
+    cl1, cl2 = st.columns(2)
 
-cl1, cl2 = st.columns(2)
+    with cl1:
+        with st.expander("Stylewise_ViewData"):
+            st.write(style_df.style.background_gradient(cmap="Greens"))
+            csv = style_df.to_csv(index=False)
+            st.download_button("Download Data", data=csv, file_name="Style.csv", mime="text/csv")
 
+    with cl2:
+        with st.expander("Channelwise_ViewData"):
+            channel_df = filtered_df.groupby(by="Channel", as_index=False)["Sales QTY"].sum()
+            st.write(channel_df.style.background_gradient(cmap="Oranges"))
+            csv = channel_df.to_csv(index=False)
+            st.download_button("Download Data", data=csv, file_name="Channel.csv", mime="text/csv")
 
-with cl1:
-    with st.expander("Stylewise_ViewData"):
-        st.write(style_df.style.background_gradient(cmap="Greens"))
-        csv = style_df.to_csv(index = False)
-        st.download_button("Download Data", data = csv, file_name="Style.csv", mime = "text/csv",
-                            help = 'Click here to download the data as a CSV file')
+    # Month-wise Line Chart
+    filtered_df["month_year"] = filtered_df["SALEDATE"].dt.to_period("M")
+    st.subheader("Monthwise Sales Analysis")
+    linechart = filtered_df.groupby(filtered_df["month_year"].dt.strftime("%Y : %b"))["Sales QTY"].sum().reset_index()
+    fig2 = px.line(linechart, x="month_year", y="Sales QTY", height=500, width=900, template="gridon")
+    st.plotly_chart(fig2, use_container_width=True)
 
-with cl2:
-    with st.expander("Channelwise_ViewData"):
-        Channel_df = filtered_df.groupby(by = "Channel", as_index = False)["Sales QTY"].sum()
-        st.write(Channel_df.style.background_gradient(cmap="Oranges"))
-        csv = Channel_df.to_csv(index = False)
-        st.download_button("Download Data", data = csv, file_name="Channel.csv", mime = "text/csv",
-                            help = 'Click here to download the data as a CSV file')
+    with st.expander("View data of Monthwise Sales"):
+        st.write(linechart.T.style.background_gradient(cmap="Greys"))
+        csv = linechart.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Data", data=csv, file_name="Monthwise_Sales.csv", mime="text/csv")
 
-# Date series Analysis line chart
+    # Treemap
+    st.subheader("Hierarchiacal view Region, Category, Sub-Category")
+    fig3 = px.treemap(filtered_df, path=["Region", "Category", "ITEM_DESC_SECONDARY"], values="Sales QTY", color="ITEM_DESC_SECONDARY")
+    fig3.update_layout(width=800, height=650)
+    st.plotly_chart(fig3, use_container_width=True)
 
-filtered_df["month_year"] = filtered_df["SALEDATE"].dt.to_period("M")
-st.subheader("Monthwise Sales Analysis")
+    # Productwise Pie Charts
+    Chart1, chart2 = st.columns(2)
 
-linechart = pd.DataFrame(filtered_df.groupby(filtered_df["month_year"].dt.strftime("%Y : %b"))["Sales QTY"].sum()).reset_index()
-fig2 = px.line(linechart, x="month_year", y="Sales QTY", labels={"Month":"Quantity"}, height=500, width=900, template="gridon")
-st.plotly_chart(fig2,use_container_width=True)
+    with Chart1:
+        st.subheader("Productwise Contribution")
+        fig = px.pie(filtered_df, values="Sales QTY", names="ITEM_DESC_SECONDARY", template="plotly_dark")
+        fig.update_traces(text=filtered_df["ITEM_DESC_SECONDARY"], textposition="inside")
+        st.plotly_chart(fig, use_container_width=True)
 
-with st.expander("View data of Monthwise Sales"):
-    st.write(linechart.T.style.background_gradient(cmap="Greys"))
-    csv = linechart.to_csv(index=False).encode("utf-8")
-    st.download_button("Download Data", data = csv, file_name="Monthwise Sales.csv", mime= 'text/csv')
+    with chart2:
+        st.subheader("Productwise Contribution")
+        fig = px.pie(filtered_df, values="Sales QTY", names="Region", template="gridon")
+        fig.update_traces(text=filtered_df["Region"], textposition="inside")
+        st.plotly_chart(fig, use_container_width=True)
 
-# Create a treemap based on Channel, (Region	Category	ITEM_DESC_SECONDARY)
+    # Pivot Table
+    st.markdown("Productwise & Monthwise sales")
+    filtered_df["month"] = filtered_df["SALEDATE"].dt.strftime("%m - %b")
+    pivot_df = pd.pivot_table(filtered_df, values="Sales QTY", index=["ITEM_DESC_SECONDARY"], columns="month", aggfunc="sum", fill_value=0)
+    st.write(pivot_df.style.background_gradient(cmap="Oranges"))
 
-st.subheader("Hierarchiacal view Region, Category, Sub-Category")
-fig3=px.treemap(filtered_df, path = ["Region","Category","ITEM_DESC_SECONDARY"], values = "Sales QTY", hover_data = ["Sales QTY"],
-                color = "ITEM_DESC_SECONDARY")
-fig3.update_layout(width=800, height=650)
-st.plotly_chart(fig3,use_container_width=True)
+    # View Sample Data
+    st.subheader("👉Data")
+    with st.expander("👉View Sample data"):
+        st.write(filtered_df.iloc[:500, 1:20].style.background_gradient(cmap="Greens"))
 
-# Category wise pie chart
-
-Chart1, chart2 = st.columns((2))
-with Chart1:
-    st.subheader("Productwise Contribution")
-    fig = px.pie(filtered_df, values= "Sales QTY", names= "ITEM_DESC_SECONDARY", template= "plotly_dark")
-    fig.update_traces(text = filtered_df["ITEM_DESC_SECONDARY"], textposition = "inside")
-    st.plotly_chart(fig,use_container_width=True)
-
-# orange color also predefined example  "plotly_dark"above, below gridon
-
-with chart2:
-    st.subheader("Productwise Contribution")
-    fig = px.pie(filtered_df, values= "Sales QTY", names= "Region", template= "gridon")
-    fig.update_traces(text = filtered_df["Region"], textposition = "inside")
-    st.plotly_chart(fig,use_container_width=True)
-
-#sample data plotly.figure factory use create a table (can create database just see pivot table etc.)(actualy not required)
-
-
-import plotly.figure_factory as ff
-#st.subheader("👉Sample Data")
-#with st.expander("Details"):
-#   df_sample = df[0:5][["Channel", "file generation", "SALEDATE", "NO.", "BRAN_NAME", "NO2", "EAN", "PRODUCT DES", "SHORT_DESC", "Region", "Category", "ITEM_DESC_SECONDARY", "GROUP2", "BRAND TBASE", "COMP ", "COLOR_DESC", "SIZE_DESC", "Sales QTY", "SALRRP", "TAX", "SALNOT", "SALMRP"]]
-#    fig = ff.create_table(df_sample, colorscale = "Cividis")
-#   st.plotly_chart(fig, use_container_width=True)
-
-st.markdown("Prductwise & Monthwise sales")
-filtered_df["month"]=filtered_df["SALEDATE"].dt.strftime("%m - %b")
-sub_category_year = pd.pivot_table(data = filtered_df, values="Sales QTY", index = ["ITEM_DESC_SECONDARY"],columns = "month",aggfunc="sum",fill_value=0)
-st.write(sub_category_year.style.background_gradient(cmap="Oranges"))
-
-#alter view data filter ilock :500,1:20
-st.subheader("👉Data")
-with st.expander("👉View Sample data"):
-    st.write(filtered_df.iloc[:500,1:20].style.background_gradient(cmap="Greens"))
-
-# download data
-
-csv = df.to_csv(index=False)
-st.download_button("Download Data", data = csv, file_name="Data.csv", mime="text/xlsx" )
+    # Download full filtered data
+    csv = df.to_csv(index=False)
+    st.download_button("Download Data", data=csv, file_name="Data.csv", mime="text/csv")
